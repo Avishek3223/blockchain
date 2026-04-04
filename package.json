@@ -1,0 +1,41 @@
+{
+  "name": "web3",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile": "hardhat compile",
+    "node": "hardhat node",
+    "deploy": "hardhat run scripts/deploy.ts --network localhost",
+    "init-pool": "hardhat run scripts/initPool.ts --network localhost",
+    "bot": "hardhat run scripts/sandwichBot.ts --network localhost",
+    "copy-deployed": "node --input-type=module -e \"import fs from 'node:fs'; fs.cpSync('deployed','dapp/public/deployed',{recursive:true})\""
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.7",
+    "@nomicfoundation/hardhat-ignition": "^3.1.1",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.3",
+    "@types/chai": "^5.2.3",
+    "@types/chai-as-promised": "^8.0.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.19.15",
+    "chai": "^6.2.2",
+    "ethers": "^6.16.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
+    "hardhat": "^3.3.0",
+    "mocha": "^11.7.5",
+    "typescript": "~5.8.0"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.96.1",
+    "next": "^15.5.14",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "viem": "^2.47.6",
+    "wagmi": "^3.6.0"
+  }
+}
