@@ -30,6 +30,12 @@ function parseAmountFromSwapSequencePayload(seq: Uint8Array): bigint {
   return v;
 }
 
+/** uint64 limitOffsetted in SWAP action: after deadline(4) + PUSH32 row(34) + SWAP(1) + poolId(32) + slot(1). */
+function parseLimitOffsettedFromSwapSequencePayload(seq: Uint8Array): bigint | null {
+  if (seq.length < 80) return null;
+  return BigInt(ethers.hexlify(seq.slice(72, 80)));
+}
+
 async function main() {
   const { ethers: hhEthers } = await network.connect({
     network: "localhost",
@@ -65,7 +71,18 @@ async function main() {
 
   const seen = new Set<string>();
   const poolId = BigInt(pool.poolId);
-  const limit = BigInt(pool.curve[2]);
+
+  function limitArg(
+    currentOffsetted: bigint,
+    zeroForOneDir: boolean,
+    slipBps: bigint,
+  ): bigint {
+    let lo = Number((poolId >> 180n) % 256n);
+    if (lo >= 128) lo -= 256;
+    const delta = (currentOffsetted * slipBps) / 10000n;
+    const target = zeroForOneDir ? currentOffsetted - delta : currentOffsetted + delta;
+    return target - (1n << 63n) + BigInt(lo) * (1n << 59n);
+  }
 
   const handler = async (hash: string) => {
     if (seen.has(hash)) return;
@@ -97,6 +114,12 @@ async function main() {
     const backrunGas = victimGas > 2n ? victimGas - 1n : 1n;
     const deadline = 2 ** 32 - 1;
 
+    const currentOffsetted = BigInt(pool.curve[2]);
+    const slip = 500n;
+    const limitParsed = parseLimitOffsettedFromSwapSequencePayload(innerBytes);
+    const victimZeroForOne =
+      limitParsed !== null ? limitParsed <= currentOffsetted : amount > 0n;
+
     const c = new Contract(raw.nofeeswap, NOFEESWAP_ABI, bot);
     const frontrunData = swapSequence(
       raw.nofeeswap,
@@ -105,8 +128,8 @@ async function main() {
       bot.address,
       poolId,
       amount > 0n ? amount / 20n : -((-amount) / 20n),
-      limit,
-      0n,
+      limitArg(currentOffsetted, victimZeroForOne, slip),
+      2n,
       "0x",
       deadline,
     );
@@ -120,8 +143,8 @@ async function main() {
       bot.address,
       poolId,
       amount > 0n ? -(amount / 20n) : (-amount) / 20n,
-      limit,
-      1n,
+      limitArg(currentOffsetted, !victimZeroForOne, slip),
+      2n,
       "0x",
       deadline,
     );
