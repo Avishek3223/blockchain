@@ -19,8 +19,7 @@
 # Hardhat coverage reports
 /coverage
 
-/dapp/node_modules
-/dapp/package-lock.json
-/dapp/package.json
-/dapp/package.json.lock
-/dapp/package.json.lock
+# Next.js / build caches (never commit)
+**/.next/
+/frontend/node_modules
+/dapp/

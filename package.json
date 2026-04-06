@@ -13,7 +13,8 @@
     "deploy": "hardhat run scripts/deploy.ts --network localhost",
     "init-pool": "hardhat run scripts/initPool.ts --network localhost",
     "bot": "hardhat run scripts/sandwichBot.ts --network localhost",
-    "copy-deployed": "node --input-type=module -e \"import fs from 'node:fs'; fs.cpSync('deployed','dapp/public/deployed',{recursive:true})\""
+    "copy-deployed": "node --input-type=module -e \"import fs from 'node:fs'; fs.cpSync('deployed','frontend/public/deployed',{recursive:true})\"",
+    "dev:ui": "npm run dev --prefix frontend"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.7",

@@ -52,16 +52,18 @@ Copy deployment artifacts for the UI:
 
 ```bash
 # PowerShell
-Copy-Item deployed\*.json dapp\public\deployed\
+Copy-Item deployed\*.json frontend\public\deployed\
 ```
 
 ## 3) Start the dApp
 
 ```bash
-cd dapp
+cd frontend
 npm install
 npm run dev
 ```
+
+From the repo root you can instead run: `npm run dev:ui` (after `npm install` inside `frontend` once).
 
 Open **http://localhost:3000**. In MetaMask:
 
@@ -126,15 +128,17 @@ npx hardhat console --network localhost
 
 ## Repository layout
 
-- `nofeeswap-core/`, `nofeeswap-operator/` — upstream clones (submodules populated for compilation).
-- `scripts/` — deploy, pool init, encoding (`lib/nofee*.ts`), sandwich bot.
-- `dapp/` — Next.js frontend.
-- `deployed/` — JSON written by scripts (copy into `dapp/public/deployed/` for the UI).
+See **`STRUCTURE.md`** for a full map. In short:
+
+- **`frontend/`** — Next.js + wagmi UI (`npm run dev:ui` from repo root, or `cd frontend && npm run dev`).
+- **`scripts/`**, **`contracts/`**, **`hardhat.config.ts`** — Hardhat deploy, init pool, sandwich bot, encoding helpers.
+- **`nofeeswap-core/`**, **`nofeeswap-operator/`** — upstream protocol sources.
+- **`deployed/`** — JSON from scripts; **`npm run copy-deployed`** copies into `frontend/public/deployed/`.
 
 ## Video walkthrough checklist
 
 1. Show `npx hardhat node` + deploy + `initPool` + `npm run copy-deployed`.
-2. `npm run dev` in `dapp`, connect MetaMask — optionally **initialize another pool** in the UI (change pool nonce), **mint/burn** liquidity, then **swap** with estimates visible.
+2. `npm run dev` in `frontend` (or `npm run dev:ui` from root), connect MetaMask — optionally **initialize another pool** in the UI (change pool nonce), **mint/burn** liquidity, then **swap** with estimates visible.
 3. Run sandwich bot with automine off, submit swap from the UI, show bot logs (amount + implied slippage bps) and mined ordering / `evm_mine` if needed.
 
 ## License / upstream
