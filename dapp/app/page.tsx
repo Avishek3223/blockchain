@@ -28,6 +28,39 @@ const NOFEESWAP_ABI = [
   "function unlock(address unlockTarget, bytes calldata data) payable returns (bytes)",
 ];
 
+/** Short lines for native `title` tooltips; longer copy uses InfoTip + data-tooltip */
+const HINT = {
+  connectWallet:
+    "Opens your browser wallet (e.g. MetaMask) so this page can send transactions. After connecting, use chain Localhost 31337 (http://127.0.0.1:8545).",
+  disconnectWallet: "Disconnects the active wallet from this site. Your keys stay in MetaMask.",
+  chainOk:
+    "You are on the local Hardhat network (chain ID 31337). This app expects that chain while developing.",
+  chainWrong:
+    "Wrong network. In MetaMask: add network Localhost with RPC http://127.0.0.1:8545 and chain ID 31337, then switch to it.",
+  poolBadge:
+    "Identifier for the initialized pool from your deployed pool.json. If swaps fail after restarting Hardhat, redeploy and run copy-deployed.",
+  directionField:
+    "Chooses which asset you sell first: token0→token1 or token1→token0. Token0/token1 are the pool’s canonical order (sorted by address).",
+  dirZeroForOne:
+    "Sell token0 and receive token1. Use when you want to move liquidity from the lower address token toward the higher.",
+  dirOneForZero:
+    "Sell token1 and receive token0. The opposite direction of Token 0 → Token 1.",
+  amountWei:
+    "Amount to swap in the token’s smallest units (wei). Example: 1000000000000000000 often means 1 token if decimals are 18. Must fit your balance and pool state.",
+  slippageBps:
+    "Slippage tolerance in basis points: 100 = 1%, 50 = 0.5%. Caps how far the execution price can move against you; lower is stricter.",
+  executeSwap:
+    "Checks contracts exist, approves the operator for tokens if needed, then sends the NoFeeSwap unlock with your swap calldata. Approve the transaction in MetaMask when prompted.",
+  executeSwapDisabled:
+    "Connect your wallet, switch to chain 31337, and wait until any in-flight transaction finishes.",
+  statusPanel:
+    "Messages from the last action: preparing approvals, transaction hash, confirmation, or errors (e.g. chain reset — redeploy and refresh).",
+  walletSection:
+    "Connect MetaMask to this site so you can sign swaps. Use the local Hardhat chain (31337) with your node running on port 8545.",
+  swapSection:
+    "Configure direction, size, and slippage, then run one swap against the pool from your deployed JSON. Approvals are requested automatically when needed.",
+} as const;
+
 function shortAddr(a: string, left = 6, right = 4) {
   if (a.length <= left + right) return a;
   return `${a.slice(0, left)}…${a.slice(-right)}`;
@@ -72,6 +105,23 @@ function IconBlocks() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M4 8l8-4 8 4v8l-8 4-8-4V8zm8-2.2L6.7 8 12 10.4 17.3 8 12 5.8zM6 10.7v4.6l6 3v-4.6l-6-3zm12 0l-6 3v4.6l6-3v-4.6z" />
     </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a1 1 0 110 2 1 1 0 010-2zm-1 4h2v5H7V7z" />
+    </svg>
+  );
+}
+
+/** Hover/focus tooltip (see `.info-tip` in globals.css). `text` is shown in the bubble and as aria-label. */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="info-tip" data-tooltip={text} tabIndex={0} role="img" aria-label={text}>
+      <IconInfo />
+    </span>
   );
 }
 
@@ -229,7 +279,7 @@ export default function Page() {
 
       <main className="app-shell">
         <header className="hero">
-          <div className="hero__badge">
+          <div className="hero__badge" title="This UI targets a local Hardhat node and submits swaps through the operator unlock path.">
             <IconBlocks />
             Local chain · Operator unlock
           </div>
@@ -241,24 +291,35 @@ export default function Page() {
 
         <div className="card card--stagger">
           <div className="card__head">
-            <h2 className="card__title">Wallet</h2>
+            <div className="card__title-row">
+              <h2 className="card__title">Wallet</h2>
+              <InfoTip text={HINT.walletSection} />
+            </div>
             {isConnected && (
-              <span className={isCorrectChain ? "chain-pill" : "chain-pill chain-pill--warn"}>
+              <span
+                className={isCorrectChain ? "chain-pill" : "chain-pill chain-pill--warn"}
+                title={isCorrectChain ? HINT.chainOk : HINT.chainWrong}
+              >
                 {isCorrectChain ? `Chain ${chain?.id}` : `Wrong chain (${chain?.id ?? "?"})`}
               </span>
             )}
           </div>
           {!isConnected ? (
-            <button type="button" className="btn btn--connect" onClick={() => connect({ connector: connectors[0] })}>
+            <button
+              type="button"
+              className="btn btn--connect"
+              title={HINT.connectWallet}
+              onClick={() => connect({ connector: connectors[0] })}
+            >
               <IconWallet />
               Connect wallet
             </button>
           ) : (
             <div className="wallet-row">
-              <span className="address-pill" title={address}>
+              <span className="address-pill" title={address ? `Full address: ${address}` : undefined}>
                 {address ? shortAddr(address) : ""}
               </span>
-              <button type="button" className="btn btn--ghost" onClick={() => disconnect()}>
+              <button type="button" className="btn btn--ghost" title={HINT.disconnectWallet} onClick={() => disconnect()}>
                 Disconnect
               </button>
             </div>
@@ -268,26 +329,40 @@ export default function Page() {
         {deployed && pool && (
           <div className="card card--stagger">
             <div className="card__head">
-              <h2 className="card__title">Swap</h2>
-              <span className="chain-pill" style={{ background: "rgba(34,211,238,0.1)", color: "var(--accent)" }}>
+              <div className="card__title-row">
+                <h2 className="card__title">Swap</h2>
+                <InfoTip text={HINT.swapSection} />
+              </div>
+              <span
+                className="chain-pill"
+                style={{ background: "rgba(34,211,238,0.1)", color: "var(--accent)" }}
+                title={HINT.poolBadge}
+              >
                 Pool {poolIdShort}
               </span>
             </div>
 
             <div className="field">
-              <span className="label">Direction</span>
+              <div className="label-row">
+                <span className="label">Direction</span>
+                <InfoTip text={HINT.directionField} />
+              </div>
               <div className="direction-toggle">
                 <button
                   type="button"
                   className={zeroForOne ? "is-active" : ""}
+                  title={HINT.dirZeroForOne}
                   onClick={() => setZeroForOne(true)}
                 >
                   Token 0 → Token 1
                 </button>
-                <IconSwapArrow />
+                <span title="Swap direction indicator">
+                  <IconSwapArrow />
+                </span>
                 <button
                   type="button"
                   className={!zeroForOne ? "is-active" : ""}
+                  title={HINT.dirOneForZero}
                   onClick={() => setZeroForOne(false)}
                 >
                   Token 1 → Token 0
@@ -296,9 +371,12 @@ export default function Page() {
             </div>
 
             <div className="field">
-              <label className="label" htmlFor="amount">
-                Amount (wei)
-              </label>
+              <div className="label-row">
+                <label className="label" htmlFor="amount">
+                  Amount (wei)
+                </label>
+                <InfoTip text={HINT.amountWei} />
+              </div>
               <div className="input-wrap">
                 <input
                   id="amount"
@@ -306,14 +384,18 @@ export default function Page() {
                   onChange={(e) => setAmountIn(e.target.value)}
                   placeholder="1000000000000000000"
                   autoComplete="off"
+                  title={HINT.amountWei}
                 />
               </div>
             </div>
 
             <div className="field">
-              <label className="label" htmlFor="slip">
-                Slippage (basis points)
-              </label>
+              <div className="label-row">
+                <label className="label" htmlFor="slip">
+                  Slippage (basis points)
+                </label>
+                <InfoTip text={HINT.slippageBps} />
+              </div>
               <div className="input-wrap">
                 <input
                   id="slip"
@@ -321,6 +403,7 @@ export default function Page() {
                   onChange={(e) => setSlippageBps(e.target.value)}
                   placeholder="100"
                   autoComplete="off"
+                  title={HINT.slippageBps}
                 />
               </div>
             </div>
@@ -329,6 +412,11 @@ export default function Page() {
               type="button"
               className="btn btn--primary"
               disabled={!isConnected || !isCorrectChain || txPhase === "pending"}
+              title={
+                !isConnected || !isCorrectChain || txPhase === "pending"
+                  ? HINT.executeSwapDisabled
+                  : HINT.executeSwap
+              }
               onClick={runSwap}
             >
               {txPhase === "pending" ? (
@@ -342,7 +430,7 @@ export default function Page() {
             </button>
 
             {(status || txPhase !== "idle") && (
-              <div className={`status-panel ${statusClass}`}>
+              <div className={`status-panel ${statusClass}`} title={HINT.statusPanel}>
                 <div className="status-panel__row">
                   {txPhase === "pending" && <span className="status-dot" />}
                   <span>{status || "Ready when you are."}</span>

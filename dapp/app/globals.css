@@ -265,6 +265,12 @@ body {
   color: var(--text);
 }
 
+.card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .label {
   display: block;
   font-size: 0.72rem;
@@ -273,6 +279,104 @@ body {
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 0.4rem;
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.label-row .label {
+  margin-bottom: 0;
+}
+
+/* Hover / keyboard focus tooltip (data-tooltip on .info-tip) */
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(3, 7, 18, 0.6);
+  color: var(--text-muted);
+  cursor: help;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.info-tip:hover,
+.info-tip:focus-visible {
+  color: var(--accent);
+  border-color: rgba(34, 211, 238, 0.45);
+  background: rgba(34, 211, 238, 0.08);
+  outline: none;
+}
+
+.info-tip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  min-width: 220px;
+  max-width: min(92vw, 320px);
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  color: var(--text);
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 20;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    visibility 0.15s;
+}
+
+.info-tip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(34, 211, 238, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  z-index: 21;
+  transition: opacity 0.15s ease, visibility 0.15s;
+}
+
+.info-tip:hover::after,
+.info-tip:focus-visible::after,
+.info-tip:hover::before,
+.info-tip:focus-visible::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.info-tip:hover::before,
+.info-tip:focus-visible::before {
+  transform: translateX(-50%);
 }
 
 .input-wrap {
