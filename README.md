@@ -1,6 +1,6 @@
 # NoFeeSwap — Local Assignment (Deploy, dApp, Sandwich Bot)
 
-Folder layout (**`frontend/`** vs chain scripts) is summarized in **`STRUCTURE.md`**.
+Folder layout (**`frontend/`** vs chain scripts) is summarized in **`STRUCTURE.md`**. A **slide-style walkthrough** for demos or interviews is in **`docs/PRESENTATION.md`**.
 
 This repository implements the technical assignment: **Hardhat** local node, **NoFeeSwap core + operator** deployment (CREATE3, matching upstream tests), **mock ERC-20s**, a **Next.js + wagmi** dApp for swaps, and a **sandwich bot** that listens for pending `unlock` txs and submits frontrun/backrun transactions with ordered gas prices.
 
