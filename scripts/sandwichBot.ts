@@ -119,6 +119,17 @@ async function main() {
     const limitParsed = parseLimitOffsettedFromSwapSequencePayload(innerBytes);
     const victimZeroForOne =
       limitParsed !== null ? limitParsed <= currentOffsetted : amount > 0n;
+    let victimSlippageBps: number | null = null;
+    if (limitParsed !== null && currentOffsetted !== 0n) {
+      const diff = limitParsed > currentOffsetted ? limitParsed - currentOffsetted : currentOffsetted - limitParsed;
+      victimSlippageBps = Number((diff * 10000n) / currentOffsetted);
+    }
+    console.log(
+      "[pending] victim limitOffsetted",
+      limitParsed?.toString() ?? "null",
+      "implied slip vs mid ~bps",
+      victimSlippageBps ?? "n/a",
+    );
 
     const c = new Contract(raw.nofeeswap, NOFEESWAP_ABI, bot);
     const frontrunData = swapSequence(

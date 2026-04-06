@@ -2,69 +2,12 @@
 
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BrowserProvider, Contract, ethers } from "ethers";
-import { swapSequence } from "@/lib/nofeeSequences";
-
-type Deployed = {
-  nofeeswap: string;
-  operator: string;
-  token0: string;
-  token1: string;
-};
-
-type PoolJson = {
-  poolId: string;
-  curve: string[];
-};
-
-const ERC20_ABI = [
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-];
-
-const NOFEESWAP_ABI = [
-  "function unlock(address unlockTarget, bytes calldata data) payable returns (bytes)",
-];
-
-/** Short lines for native `title` tooltips; longer copy uses InfoTip + data-tooltip */
-const HINT = {
-  connectWallet:
-    "Opens your browser wallet (e.g. MetaMask) so this page can send transactions. After connecting, use chain Localhost 31337 (http://127.0.0.1:8545).",
-  disconnectWallet: "Disconnects the active wallet from this site. Your keys stay in MetaMask.",
-  chainOk:
-    "You are on the local Hardhat network (chain ID 31337). This app expects that chain while developing.",
-  chainWrong:
-    "Wrong network. In MetaMask: add network Localhost with RPC http://127.0.0.1:8545 and chain ID 31337, then switch to it.",
-  poolBadge:
-    "Identifier for the initialized pool from your deployed pool.json. If swaps fail after restarting Hardhat, redeploy and run copy-deployed.",
-  directionField:
-    "Chooses which asset you sell first: token0→token1 or token1→token0. Token0/token1 are the pool’s canonical order (sorted by address).",
-  dirZeroForOne:
-    "Sell token0 and receive token1. Use when you want to move liquidity from the lower address token toward the higher.",
-  dirOneForZero:
-    "Sell token1 and receive token0. The opposite direction of Token 0 → Token 1.",
-  amountWei:
-    "Amount to swap in the token’s smallest units (wei). Example: 1000000000000000000 often means 1 token if decimals are 18. Must fit your balance and pool state.",
-  slippageBps:
-    "Slippage tolerance in basis points: 100 = 1%, 50 = 0.5%. Caps how far the execution price can move against you; lower is stricter.",
-  executeSwap:
-    "Checks contracts exist, approves the operator for tokens if needed, then sends the NoFeeSwap unlock with your swap calldata. Approve the transaction in MetaMask when prompted.",
-  executeSwapDisabled:
-    "Connect your wallet, switch to chain 31337, and wait until any in-flight transaction finishes.",
-  statusPanel:
-    "Messages from the last action: preparing approvals, transaction hash, confirmation, or errors (e.g. chain reset — redeploy and refresh).",
-  walletSection:
-    "Connect MetaMask to this site so you can sign swaps. Use the local Hardhat chain (31337) with your node running on port 8545.",
-  swapSection:
-    "Configure direction, size, and slippage, then run one swap against the pool from your deployed JSON. Approvals are requested automatically when needed.",
-} as const;
-
-function shortAddr(a: string, left = 6, right = 4) {
-  if (a.length <= left + right) return a;
-  return `${a.slice(0, left)}…${a.slice(-right)}`;
-}
+import { PoolInitSection } from "@/components/PoolInitSection";
+import { LiquiditySection } from "@/components/LiquiditySection";
+import { SwapSection } from "@/components/SwapSection";
+import { useActivePool } from "@/hooks/useActivePool";
+import { useLiquidityPosition } from "@/hooks/useLiquidityPosition";
+import type { DeployedAddresses, PoolJson } from "@/lib/types";
 
 function IconWallet({ className }: { className?: string }) {
   return (
@@ -86,20 +29,6 @@ function IconWallet({ className }: { className?: string }) {
   );
 }
 
-function IconSwapArrow() {
-  return (
-    <svg className="direction-toggle__arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M5 12h14M13 6l6 6-6 6"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function IconBlocks() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -108,156 +37,87 @@ function IconBlocks() {
   );
 }
 
-function IconInfo() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-      <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a1 1 0 110 2 1 1 0 010-2zm-1 4h2v5H7V7z" />
-    </svg>
-  );
-}
-
-/** Hover/focus tooltip (see `.info-tip` in globals.css). `text` is shown in the bubble and as aria-label. */
 function InfoTip({ text }: { text: string }) {
   return (
     <span className="info-tip" data-tooltip={text} tabIndex={0} role="img" aria-label={text}>
-      <IconInfo />
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a1 1 0 110 2 1 1 0 010-2zm-1 4h2v5H7V7z" />
+      </svg>
     </span>
   );
+}
+
+const HINT = {
+  connectWallet:
+    "Opens your browser wallet (e.g. MetaMask). After connecting, use chain Localhost 31337 (http://127.0.0.1:8545).",
+  disconnectWallet: "Disconnects the active wallet from this site.",
+  chainOk: "You are on the local Hardhat network (chain ID 31337).",
+  chainWrong: "Switch MetaMask to Localhost 31337 (RPC http://127.0.0.1:8545).",
+  walletSection: "Connect MetaMask to sign pool init, liquidity, and swaps.",
+} as const;
+
+function shortAddr(a: string, left = 6, right = 4) {
+  if (a.length <= left + right) return a;
+  return `${a.slice(0, left)}…${a.slice(-right)}`;
 }
 
 export default function Page() {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const [deployed, setDeployed] = useState<Deployed | null>(null);
-  const [pool, setPool] = useState<PoolJson | null>(null);
-  const [amountIn, setAmountIn] = useState("1000000000000000000");
-  const [slippageBps, setSlippageBps] = useState("100");
-  const [zeroForOne, setZeroForOne] = useState(true);
-  const [status, setStatus] = useState<string>("");
+  const [deployed, setDeployed] = useState<DeployedAddresses | null>(null);
+  const [fetchedPool, setFetchedPool] = useState<PoolJson | null>(null);
+  const [loadErr, setLoadErr] = useState<string>("");
+  const [status, setStatus] = useState("");
   const [txPhase, setTxPhase] = useState<"idle" | "pending" | "confirmed" | "reverted">("idle");
+
+  const { pool, savePool, resetToDeployed, hydrated } = useActivePool(fetchedPool);
+  const { position, savePosition, clearPosition } = useLiquidityPosition(pool?.poolId);
 
   const isCorrectChain = chain?.id === 31337;
 
+  const deployedFull = useMemo(() => {
+    if (!deployed) return null;
+    if (!deployed.delegatee || !deployed.poolGrowthPortion) return null;
+    return deployed;
+  }, [deployed]);
+
+  const handleGlobalStatus = useCallback(
+    (s: string, phase: "idle" | "pending" | "confirmed" | "reverted") => {
+      setStatus(s);
+      setTxPhase(phase);
+    },
+    [],
+  );
+
+  const onPoolCreated = useCallback(
+    (p: PoolJson) => {
+      savePool(p);
+      setTxPhase("confirmed");
+    },
+    [savePool],
+  );
+
   useEffect(() => {
     fetch("/deployed/addresses.json")
-      .then((r) => r.json())
-      .then(setDeployed)
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then((j) => {
+        setDeployed(j as DeployedAddresses);
+        setLoadErr("");
+      })
       .catch(() =>
-        setStatus("Could not load /deployed/addresses.json — run deploy + copy to public/deployed"),
+        setLoadErr("Could not load /deployed/addresses.json — deploy and npm run copy-deployed from repo root."),
       );
     fetch("/deployed/pool.json")
-      .then((r) => r.json())
-      .then(setPool)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j) setFetchedPool(j as PoolJson);
+      })
       .catch(() => {});
   }, []);
-
-  const runSwap = useCallback(async () => {
-    if (!deployed || !pool || !address) {
-      setStatus("Connect wallet and ensure pool is deployed.");
-      return;
-    }
-    const eth = (typeof window !== "undefined" && (window as unknown as { ethereum?: unknown }).ethereum) as
-      | ethers.Eip1193Provider
-      | undefined;
-    if (!eth) {
-      setStatus("No injected wallet (MetaMask).");
-      return;
-    }
-    if (chain?.id !== 31337) {
-      setStatus("Switch MetaMask to Localhost 31337 (add http://127.0.0.1:8545).");
-      return;
-    }
-    setTxPhase("pending");
-    setStatus("Submitting… check MetaMask.");
-    try {
-      const provider = new BrowserProvider(eth);
-      const signer = await provider.getSigner();
-      const op = deployed.operator;
-
-      for (const [label, addr] of [
-        ["token0", deployed.token0],
-        ["token1", deployed.token1],
-        ["NoFeeSwap", deployed.nofeeswap],
-        ["operator", op],
-      ] as const) {
-        const code = await provider.getCode(addr);
-        if (!code || code === "0x") {
-          setTxPhase("reverted");
-          setStatus(
-            `No contract at ${label} (${addr}). The chain was reset — run from repo root: npx hardhat run scripts/deploy.ts --network localhost && npx hardhat run scripts/initPool.ts --network localhost && npm run copy-deployed — then refresh this page.`,
-          );
-          return;
-        }
-      }
-
-      const t0 = new Contract(deployed.token0, ERC20_ABI, signer);
-      const t1 = new Contract(deployed.token1, ERC20_ABI, signer);
-      const max = ethers.MaxUint256;
-      let a0: bigint;
-      let a1: bigint;
-      try {
-        a0 = await t0.allowance(address, op);
-        a1 = await t1.allowance(address, op);
-      } catch (err) {
-        setTxPhase("reverted");
-        setStatus(
-          `allowance() failed on token (CALL_EXCEPTION). Usually: Hardhat was restarted without redeploying. Redeploy, copy JSON to dapp/public/deployed/, refresh. ${err instanceof Error ? err.message : String(err)}`,
-        );
-        return;
-      }
-      if (a0 < BigInt(amountIn)) {
-        setStatus("Approving token0…");
-        await (await t0.approve(op, max)).wait();
-      }
-      if (a1 < BigInt(amountIn)) {
-        setStatus("Approving token1…");
-        await (await t1.approve(op, max)).wait();
-      }
-
-      const poolId = BigInt(pool.poolId);
-      let logOffset = Number((poolId >> 180n) % 256n);
-      if (logOffset >= 128) logOffset -= 256;
-
-      const currentOffsetted = BigInt(pool.curve[2]);
-      const slip = BigInt(slippageBps);
-      const delta = (currentOffsetted * slip) / BigInt(10000);
-      const targetOffsetted = zeroForOne ? currentOffsetted - delta : currentOffsetted + delta;
-      const limit = targetOffsetted - (1n << 63n) + BigInt(logOffset) * (1n << 59n);
-
-      const amountSpecified = BigInt(amountIn);
-      const deadline = 2 ** 32 - 1;
-      const zfo = 2n;
-
-      const data = swapSequence(
-        deployed.nofeeswap,
-        deployed.token0,
-        deployed.token1,
-        address,
-        poolId,
-        amountSpecified,
-        limit,
-        zfo,
-        "0x",
-        deadline,
-      );
-
-      const ns = new Contract(deployed.nofeeswap, NOFEESWAP_ABI, signer);
-      const tx = await ns.unlock(op, data);
-      setStatus(`Pending: ${tx.hash}`);
-      const rec = await tx.wait();
-      if (rec?.status === 1) {
-        setTxPhase("confirmed");
-        setStatus(`Confirmed in block ${rec.blockNumber}: ${tx.hash}`);
-      } else {
-        setTxPhase("reverted");
-        setStatus(`Reverted: ${tx.hash}`);
-      }
-    } catch (e: unknown) {
-      setTxPhase("reverted");
-      setStatus(e instanceof Error ? e.message : String(e));
-    }
-  }, [deployed, pool, address, chain?.id, amountIn, slippageBps, zeroForOne]);
 
   const statusClass = useMemo(() => {
     if (txPhase === "pending") return "status-panel--pending";
@@ -265,8 +125,6 @@ export default function Page() {
     if (txPhase === "reverted") return "status-panel--err";
     return "";
   }, [txPhase]);
-
-  const poolIdShort = pool ? shortAddr(pool.poolId, 10, 8) : "";
 
   return (
     <>
@@ -277,171 +135,141 @@ export default function Page() {
         <div className="app-bg__scan" />
       </div>
 
-      <main className="app-shell">
-        <header className="hero">
-          <div className="hero__badge" title="This UI targets a local Hardhat node and submits swaps through the operator unlock path.">
+      <main className="app-shell app-shell--dashboard">
+        <header className="hero hero--bounded">
+          <div
+            className="hero__badge"
+            title="Local Hardhat + NoFeeSwap operator unlock path: initialize pool, mint/burn liquidity, swap."
+          >
             <IconBlocks />
-            Local chain · Operator unlock
+            Local chain · Full assignment UI
           </div>
           <h1 className="hero__title">NoFeeSwap</h1>
           <p className="hero__sub">
-            Swap against your Hardhat pool through MetaMask. Built for clarity — same path the Operator uses on-chain.
+            Initialize a pool, manage liquidity, and swap — with spot estimates and a kernel preview. Requires{" "}
+            <code className="inline-code">deployed/*.json</code> in <code className="inline-code">public/deployed</code>.
           </p>
         </header>
 
-        <div className="card card--stagger">
-          <div className="card__head">
-            <div className="card__title-row">
-              <h2 className="card__title">Wallet</h2>
-              <InfoTip text={HINT.walletSection} />
+        <div className="dashboard-top">
+          <div className="card card--stagger card--wallet-bar">
+            <div className="card__head card__head--wallet">
+              <div className="card__title-row">
+                <h2 className="card__title">Wallet</h2>
+                <InfoTip text={HINT.walletSection} />
+              </div>
+              {isConnected && (
+                <span
+                  className={isCorrectChain ? "chain-pill" : "chain-pill chain-pill--warn"}
+                  title={isCorrectChain ? HINT.chainOk : HINT.chainWrong}
+                >
+                  {isCorrectChain ? `Chain ${chain?.id}` : `Wrong chain (${chain?.id ?? "?"})`}
+                </span>
+              )}
             </div>
-            {isConnected && (
-              <span
-                className={isCorrectChain ? "chain-pill" : "chain-pill chain-pill--warn"}
-                title={isCorrectChain ? HINT.chainOk : HINT.chainWrong}
+            {!isConnected ? (
+              <button
+                type="button"
+                className="btn btn--connect btn--wallet-action"
+                title={HINT.connectWallet}
+                onClick={() => connect({ connector: connectors[0] })}
               >
-                {isCorrectChain ? `Chain ${chain?.id}` : `Wrong chain (${chain?.id ?? "?"})`}
-              </span>
+                <IconWallet />
+                Connect wallet
+              </button>
+            ) : (
+              <div className="wallet-row wallet-row--bar">
+                <span className="address-pill" title={address ? `Full address: ${address}` : undefined}>
+                  {address ? shortAddr(address) : ""}
+                </span>
+                <button type="button" className="btn btn--ghost" title={HINT.disconnectWallet} onClick={() => disconnect()}>
+                  Disconnect
+                </button>
+              </div>
             )}
           </div>
-          {!isConnected ? (
-            <button
-              type="button"
-              className="btn btn--connect"
-              title={HINT.connectWallet}
-              onClick={() => connect({ connector: connectors[0] })}
-            >
-              <IconWallet />
-              Connect wallet
-            </button>
-          ) : (
-            <div className="wallet-row">
-              <span className="address-pill" title={address ? `Full address: ${address}` : undefined}>
-                {address ? shortAddr(address) : ""}
-              </span>
-              <button type="button" className="btn btn--ghost" title={HINT.disconnectWallet} onClick={() => disconnect()}>
-                Disconnect
-              </button>
+
+          {loadErr && (
+            <div className="card card--stagger card--alert-inline">
+              <p className="status-panel status-panel--err">{loadErr}</p>
             </div>
+          )}
+
+          {hydrated && deployedFull && pool && (
+            <p className="pool-revert pool-revert--bar">
+              <button type="button" className="link-btn" onClick={resetToDeployed}>
+                Reset pool to deployed/pool.json
+              </button>{" "}
+              <span className="pool-revert__hint">(clears local override)</span>
+            </p>
           )}
         </div>
 
-        {deployed && pool && (
-          <div className="card card--stagger">
-            <div className="card__head">
-              <div className="card__title-row">
-                <h2 className="card__title">Swap</h2>
-                <InfoTip text={HINT.swapSection} />
-              </div>
-              <span
-                className="chain-pill"
-                style={{ background: "rgba(34,211,238,0.1)", color: "var(--accent)" }}
-                title={HINT.poolBadge}
-              >
-                Pool {poolIdShort}
-              </span>
+        {deployedFull && (
+          <div className="dashboard-grid">
+            <div className="dashboard-col">
+              <PoolInitSection
+                deployed={deployedFull}
+                address={address}
+                isConnected={isConnected}
+                isCorrectChain={isCorrectChain}
+                onPoolCreated={onPoolCreated}
+                onStatus={handleGlobalStatus}
+              />
             </div>
 
-            <div className="field">
-              <div className="label-row">
-                <span className="label">Direction</span>
-                <InfoTip text={HINT.directionField} />
-              </div>
-              <div className="direction-toggle">
-                <button
-                  type="button"
-                  className={zeroForOne ? "is-active" : ""}
-                  title={HINT.dirZeroForOne}
-                  onClick={() => setZeroForOne(true)}
-                >
-                  Token 0 → Token 1
-                </button>
-                <span title="Swap direction indicator">
-                  <IconSwapArrow />
-                </span>
-                <button
-                  type="button"
-                  className={!zeroForOne ? "is-active" : ""}
-                  title={HINT.dirOneForZero}
-                  onClick={() => setZeroForOne(false)}
-                >
-                  Token 1 → Token 0
-                </button>
-              </div>
-            </div>
-
-            <div className="field">
-              <div className="label-row">
-                <label className="label" htmlFor="amount">
-                  Amount (wei)
-                </label>
-                <InfoTip text={HINT.amountWei} />
-              </div>
-              <div className="input-wrap">
-                <input
-                  id="amount"
-                  value={amountIn}
-                  onChange={(e) => setAmountIn(e.target.value)}
-                  placeholder="1000000000000000000"
-                  autoComplete="off"
-                  title={HINT.amountWei}
-                />
-              </div>
-            </div>
-
-            <div className="field">
-              <div className="label-row">
-                <label className="label" htmlFor="slip">
-                  Slippage (basis points)
-                </label>
-                <InfoTip text={HINT.slippageBps} />
-              </div>
-              <div className="input-wrap">
-                <input
-                  id="slip"
-                  value={slippageBps}
-                  onChange={(e) => setSlippageBps(e.target.value)}
-                  placeholder="100"
-                  autoComplete="off"
-                  title={HINT.slippageBps}
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={!isConnected || !isCorrectChain || txPhase === "pending"}
-              title={
-                !isConnected || !isCorrectChain || txPhase === "pending"
-                  ? HINT.executeSwapDisabled
-                  : HINT.executeSwap
-              }
-              onClick={runSwap}
-            >
-              {txPhase === "pending" ? (
+            <div className="dashboard-col dashboard-col--trade">
+              {hydrated && pool && (
                 <>
-                  <span className="status-dot" style={{ marginTop: 0 }} />
-                  Confirm in wallet…
-                </>
-              ) : (
-                "Execute swap"
-              )}
-            </button>
+                  <LiquiditySection
+                    deployed={deployedFull}
+                    pool={pool}
+                    address={address}
+                    isConnected={isConnected}
+                    isCorrectChain={isCorrectChain}
+                    position={position}
+                    onSavePosition={savePosition}
+                    onClearPosition={clearPosition}
+                    onStatus={handleGlobalStatus}
+                  />
 
-            {(status || txPhase !== "idle") && (
-              <div className={`status-panel ${statusClass}`} title={HINT.statusPanel}>
-                <div className="status-panel__row">
-                  {txPhase === "pending" && <span className="status-dot" />}
-                  <span>{status || "Ready when you are."}</span>
+                  <SwapSection
+                    deployed={deployedFull}
+                    pool={pool}
+                    address={address}
+                    isConnected={isConnected}
+                    isCorrectChain={isCorrectChain}
+                    setStatus={setStatus}
+                    txPhase={txPhase}
+                    setTxPhase={setTxPhase}
+                  />
+                </>
+              )}
+
+              {hydrated && !pool && (
+                <div className="card card--stagger card--hint-tall">
+                  <p className="muted-p">
+                    No <code className="inline-code">pool.json</code> yet. Run <code className="inline-code">initPool.ts</code>{" "}
+                    and <code className="inline-code">npm run copy-deployed</code>, refresh, or initialize a pool in the left
+                    column (set a unique <strong>pool nonce</strong> per pool).
+                  </p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+        )}
+
+        {status && (
+          <div className={`status-panel global-status ${statusClass}`}>
+            <div className="status-panel__row">
+              {txPhase === "pending" && <span className="status-dot" />}
+              <span>{status}</span>
+            </div>
           </div>
         )}
 
         <p className="footer-hint">
-          <span>◆</span> Signed locally · NoFeeSwap assignment UI
+          <span>◆</span> NoFeeSwap assignment — estimates are spot-based, not an on-chain quoter
         </p>
       </main>
     </>

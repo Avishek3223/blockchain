@@ -105,19 +105,21 @@ npx hardhat console --network localhost
 | Core + operator deploy (CREATE3, modifyProtocol, setOperator) | **Complete** |
 | Mock ERC-20 + mint to deployer | **Complete** |
 | Pool initialize + scripted mint (`initPool.ts`) | **Complete** |
-| dApp: wallet connect + tx pending/confirmed/reverted | **Complete** (basic messaging) |
-| dApp: pool initialization UI | **Omitted** — done via script (kernel uses `SwapData_test`-style data; no graphical kernel editor) |
-| dApp: liquidity mint/burn UI | **Partial** — liquidity added in `initPool.ts`; UI focuses on swap |
-| dApp: swap + slippage control | **Partial** — slippage maps to a **rough** log-limit adjustment; no quoter integration |
-| dApp: estimated output / price impact | **Omitted** — would require quoter or heavy RPC simulation |
+| dApp: wallet connect + tx pending/confirmed/reverted | **Complete** (global status line + section actions) |
+| dApp: pool initialization UI | **Complete** — `dispatch(initialize(...))` via delegatee ABI; **kernel preview** chart + editable kernel/curve parameters (same encoding as `initPool.ts`). Unique **pool nonce** per pool from the same account. |
+| dApp: liquidity mint/burn UI | **Complete** — mint/burn via `unlock` + sequences; **position** (shares, range, tagShares) tracked in **localStorage** (demo — not an on-chain share index). |
+| dApp: swap + slippage control | **Complete** — same path as before; slippage adjusts log limit. |
+| dApp: estimated output / price impact | **Complete (spot model)** — **not** an on-chain quoter: estimates from **curve mid-price** + implied slippage vs mid from your limit; clearly labeled in UI. |
 | Bot: mempool monitoring | **Complete** (WebSocket `pending` on Hardhat) |
-| Bot: calldata decode for victim size / slippage | **Partial** — extracts `amountSpecified`; full slippage limit would require deeper bytecode parse |
+| Bot: calldata decode for victim size / slippage | **Complete (practical)** — `amountSpecified` + **limitOffsetted** parse + **~bps** vs mid logged |
 | Bot: sandwich gas ordering | **Complete** (EOA txs, gas price ladder) |
 | Anvil-specific scripts | **Omitted** — README documents equivalence; install Foundry to swap tooling |
 
 ## Known limitations
 
-- **Kernel UI** not implemented; initialization uses the **mock kernel/curve pattern** from `SwapData_test.py` (see `scripts/initPool.ts`).
+- **LP position display** is **browser-local** (localStorage), not read from chain state.
+- **Swap estimates** use a **spot approximation** from the packed curve; for production you would add a quoter or `eth_call` simulation strategy.
+- **Kernel UI** is a **compact preview** (two-segment default editable); advanced multi-breakpoint editing matches script-level data, not a full YellowPaper authoring tool.
 - **JavaScript `%` vs Python `%`:** curve lower bound must use **Python-style** non-negative modulus (`pyMod` in `initPool.ts`) or initialization reverts.
 - **Sandwich on Hardhat:** ordering in a real mempool is simplified; you may need **`evm_mine`** to close blocks for demos.
 - **Security:** test keys and localhost only — never reuse on mainnet.
@@ -131,9 +133,9 @@ npx hardhat console --network localhost
 
 ## Video walkthrough checklist
 
-1. Show `npx hardhat node` + deploy + `initPool`.
-2. `npm run dev` in `dapp`, connect MetaMask, perform a swap.
-3. Run sandwich bot with automine off, submit swap, show logs / mined order.
+1. Show `npx hardhat node` + deploy + `initPool` + `npm run copy-deployed`.
+2. `npm run dev` in `dapp`, connect MetaMask — optionally **initialize another pool** in the UI (change pool nonce), **mint/burn** liquidity, then **swap** with estimates visible.
+3. Run sandwich bot with automine off, submit swap from the UI, show bot logs (amount + implied slippage bps) and mined ordering / `evm_mine` if needed.
 
 ## License / upstream
 
