@@ -39,3 +39,5 @@ This repo is split into **chain / backend tooling** (Hardhat, scripts, bots) and
 - **UI:** `npm run dev:ui` or `cd frontend && npm run dev`
 
 The old **`dapp/`** folder name is **deprecated**; use **`frontend/`** only.
+
+If you still see a **`dapp/`** directory locally (often only `.next/` + `node_modules/`), it is safe to delete after **stopping** `npm run dev` and any process locking files under `dapp` (Windows may lock `*.node` binaries until processes exit). It is listed in `.gitignore` so it will not be committed again.
